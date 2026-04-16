@@ -14,18 +14,19 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HF_HOME=/opt/hf_cache \
     UV_SYSTEM_PYTHON=1 \
     UV_LINK_MODE=copy \
-    PATH=/opt/venv/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin
+    PATH=/opt/venv/bin:/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
 # System deps + Python 3.11 from deadsnakes
 # passwd provides useradd/groupadd (not present in minimal CUDA runtime image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        software-properties-common ca-certificates curl gpg-agent passwd \
+        software-properties-common ca-certificates curl gpg-agent \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
         python3.11 python3.11-venv python3.11-dev \
         git curl jq tini \
         build-essential pkg-config \
         libssl-dev libffi-dev \
+        passwd adduser login \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/python3.11 /usr/local/bin/python3 \
     && ln -sf /usr/bin/python3.11 /usr/local/bin/python
@@ -67,9 +68,11 @@ RUN python3 -m venv /opt/venv \
 RUN ln -sf /opt/venv/bin/btcli /usr/local/bin/btcli || true
 
 # Non-root user. CUDA runtime works fine for non-root when /dev/nvidia* is
-# exposed by nvidia-container-toolkit.
-RUN groupadd -g 1000 miner \
-    && useradd -m -u 1000 -g 1000 -s /bin/bash miner \
+# exposed by nvidia-container-toolkit. Use absolute paths since /usr/sbin may
+# not be on PATH during RUN in some base images.
+RUN which groupadd || ls -la /usr/sbin/groupadd /sbin/groupadd 2>&1 || true \
+    && /usr/sbin/groupadd -g 1000 miner \
+    && /usr/sbin/useradd -m -u 1000 -g 1000 -s /bin/bash miner \
     && mkdir -p /opt/hf_cache /home/miner/.bittensor/wallets \
     && chown -R miner:miner /opt/hf_cache /home/miner /opt/teutonic
 
