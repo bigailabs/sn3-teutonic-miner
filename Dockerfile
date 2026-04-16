@@ -17,8 +17,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PATH=/opt/venv/bin:/root/.local/bin:/usr/local/bin:/usr/bin:/bin
 
 # System deps + Python 3.11 from deadsnakes
+# passwd provides useradd/groupadd (not present in minimal CUDA runtime image)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        software-properties-common ca-certificates curl gpg-agent \
+        software-properties-common ca-certificates curl gpg-agent passwd \
     && add-apt-repository -y ppa:deadsnakes/ppa \
     && apt-get update && apt-get install -y --no-install-recommends \
         python3.11 python3.11-venv python3.11-dev \
@@ -47,16 +48,19 @@ RUN git clone https://github.com/unarbos/teutonic /opt/teutonic \
 
 WORKDIR /opt/teutonic
 
-# Create a venv and install deps. Try uv pip first (fast, hermetic), fall back
-# to plain pip. We install into a venv at /opt/venv so PATH works for non-root.
+# Create a venv and install deps. Use plain pip with pinned numpy (1.26.4 has
+# cp311 manylinux wheels; unpinned 'numpy<2' sometimes resolves to a sdist and
+# tries to compile via Cython, which breaks on minimal CUDA images).
+# Torch CUDA 12.1 wheels work fine on CUDA 12.8 driver runtimes.
 RUN python3 -m venv /opt/venv \
-    && /opt/venv/bin/pip install --upgrade pip wheel setuptools \
-    && (uv pip install --python /opt/venv/bin/python --no-cache \
-         'bittensor>=9.0.0' boto3 httpx 'numpy<2' scipy huggingface-hub \
-         torch safetensors transformers \
-         || /opt/venv/bin/pip install --no-cache-dir \
-              'bittensor>=9.0.0' boto3 httpx 'numpy<2' scipy huggingface-hub \
-              torch safetensors transformers) \
+    && /opt/venv/bin/pip install --upgrade 'pip>=24.0' wheel setuptools \
+    && /opt/venv/bin/pip install --no-cache-dir 'numpy==1.26.4' \
+    && /opt/venv/bin/pip install --no-cache-dir \
+         --index-url https://download.pytorch.org/whl/cu121 \
+         'torch==2.4.1+cu121' \
+    && /opt/venv/bin/pip install --no-cache-dir \
+         'bittensor>=9.0.0' boto3 httpx scipy 'huggingface-hub>=0.24' \
+         safetensors 'transformers>=4.44' \
     && /opt/venv/bin/pip install --no-cache-dir -e /opt/teutonic || true
 
 # btcli is provided by bittensor; ensure it's on PATH
