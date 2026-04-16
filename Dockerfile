@@ -38,7 +38,12 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh \
 RUN git clone https://github.com/unarbos/teutonic /opt/teutonic \
     && cd /opt/teutonic \
     && git checkout ${TEUTONIC_SHA} \
-    && git rev-parse HEAD > /opt/teutonic/.pinned-sha
+    && git rev-parse HEAD > /opt/teutonic/.pinned-sha \
+    # Patch miner.py so the challenger repo uses $HF_USER (if set) instead of
+    # the hardcoded "unconst" org. Upstream has `challenger_repo = f"unconst/Teutonic-I-{suffix}"`
+    # and the dashboard shows competitors pushing under their own HF namespaces.
+    && sed -i 's|challenger_repo = f"unconst/Teutonic-I-{suffix}"|challenger_repo = f"{os.environ.get(\"HF_USER\") or \"unconst\"}/Teutonic-I-{suffix}"|' /opt/teutonic/miner.py \
+    && grep -n "challenger_repo = " /opt/teutonic/miner.py
 
 WORKDIR /opt/teutonic
 

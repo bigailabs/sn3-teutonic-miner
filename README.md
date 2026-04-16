@@ -159,7 +159,7 @@ Reasoning: total SN3 miner-bucket emission is roughly 77 TAO-equivalent/day (~41
 
 ## Known issues
 
-- `miner.py` repo name pattern is hardcoded to `unconst/Teutonic-I-<suffix>`. Your HF account will need push access to that org, **or** you'll need to fork `unarbos/teutonic` and patch the `challenger_repo` line. The unarbos code appears to rely on a shared org — expect this to change.
+- **miner.py repo pattern patched at build time.** Upstream hardcodes `challenger_repo = f"unconst/Teutonic-I-{suffix}"`, but the on-chain regex accepts any `<user>/Teutonic-I-<suffix>` and the current king (`22oseni/Teutonic-I-boo7`) proves competitors push under their own HF namespaces. The Dockerfile applies a `sed` patch so the image uses `$HF_USER/Teutonic-I-<suffix>` at runtime (falls back to `unconst` if `HF_USER` is unset). If Fred's HF user `tabak25` is set, pushes go to `tabak25/Teutonic-I-h0`.
 - The wrapper triggers a resubmit every `MIN_SUBMIT_GAP_SEC` (default 10 min). If the subnet tightens rate-limits you'll see `miner.py` exit non-zero; the wrapper backs off exponentially to 30 min max.
 - No multi-GPU parallelism. 2x A100 host? You can run two containers with different hotkeys and different `TEUTONIC_SUFFIX` (and different `CUDA_VISIBLE_DEVICES=0` / `=1`) to get two independent challengers.
 - Teutonic is moving fast. The pinned commit in the Dockerfile is `1d86c2dbcc9e9b6cb2a8a9aefb1e66337d6d37e4`. When upstream changes miner.py flags or behavior, rebuild with `--build-arg TEUTONIC_SHA=<new>` and cut a new image tag.
